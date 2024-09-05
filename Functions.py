@@ -1,0 +1,43 @@
+import mysql.connector
+from datetime import datetime
+
+# MySQL connection
+def get_db_connection():
+    conn = mysql.connector.connect(
+        host="localhost",
+        user="root",  
+        password="root",  
+        database="2wayaccess"
+    )
+    return conn
+
+def log_access_to_db(employee_id, timestamp, action):
+    """Log access event into the database"""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    query = "INSERT INTO access_logs (employee_id, timestamp, action) VALUES (%s, %s, %s)"
+    cursor.execute(query, (employee_id, timestamp, action))
+    conn.commit()
+    
+    cursor.close()
+    conn.close()
+
+def get_employee_logs(employee_id, date=None):
+    """Retrieve employee logs from the database"""
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+    
+    if date:
+        query = "SELECT * FROM access_logs WHERE employee_id = %s AND DATE(timestamp) = %s ORDER BY timestamp"
+        cursor.execute(query, (employee_id, date))
+    else:
+        query = "SELECT * FROM access_logs WHERE employee_id = %s ORDER BY timestamp"
+        cursor.execute(query, (employee_id,))
+    
+    rows = cursor.fetchall()
+    
+    cursor.close()
+    conn.close()
+    
+    return rows
