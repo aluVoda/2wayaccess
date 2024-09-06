@@ -1,6 +1,6 @@
 from EmployeeMonitor import EmployeeMonitor
 from Employees import FullTimeEmployee, PartTimeEmployee
-from Functions import log_access_to_db
+from Functions import log_access_to_db, get_employee_status
 import random
 import datetime
 
@@ -10,17 +10,23 @@ def generate_random_time(base_time):
     return base_time + datetime.timedelta(minutes=random_minutes)
 
 def generate_random_access_logs(monitor, num_employees=130):
-    """Generates random access logs for employees and adds them to the database"""
+    """Generates random access logs for employees based on their employment status"""
     # Current day and base entry time for random time generation
     base_date = datetime.datetime(2024, 9, 5, 8, 0, 0)  # Base date (e.g. 8:00 AM)
 
     for employee_id in range(1, num_employees + 1):
-        # Randomly assign full-time or part-time status
-        if random.choice([True, False]):
+        # Fetch employment status from the database
+        employment_status = get_employee_status(employee_id)
+
+        # Create the appropriate employee object based on status
+        if employment_status == 'full_time':
             employee = FullTimeEmployee(employee_id)
-        else:
+        elif employment_status == 'part_time':
             employee = PartTimeEmployee(employee_id)
-        
+        else:
+            print(f"Error: Employee {employee_id} does not have a valid employment status.")
+            continue
+
         monitor.add_employee(employee)
 
         # Generate random entry time
@@ -43,3 +49,4 @@ def run_simulation():
 
     # Generate random access logs for 130 employees
     generate_random_access_logs(monitor, 130)
+

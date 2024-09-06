@@ -41,3 +41,20 @@ def get_employee_logs(employee_id, date=None):
     conn.close()
     
     return rows
+
+def get_employee_status(employee_id):
+    """Fetch the employment status of an employee from the database"""
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+
+    query = "SELECT employment_status FROM employees WHERE employee_id = %s"
+    cursor.execute(query, (employee_id,))
+    result = cursor.fetchone()
+
+    cursor.close()
+    conn.close()
+
+    if result:
+        return result['employment_status']
+    else:
+        return None

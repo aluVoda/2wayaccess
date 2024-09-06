@@ -4,12 +4,11 @@ def create_database_and_table():
     try:
         # Connect to MySQL server
         conn = mysql.connector.connect(
-            host='localhost',        # Hostname of the MySQL server (e.g., 'localhost')
-            database='2wayaccess', # Name of the MySQL database
-            user='root',     # MySQL username
-            password='root'  # MySQL password
-        )    
-             
+            host="localhost",  
+            user="root",       
+            password="root",
+            database="2wayaccess" 
+        )
         cursor = conn.cursor()
 
         # Create the database
@@ -27,7 +26,17 @@ def create_database_and_table():
         );
         """
         cursor.execute(create_table_query)
-        print("Table 'access_logs' created or already exists.")
+
+        # Create the employees table for employment status
+        create_employees_table = """
+        CREATE TABLE IF NOT EXISTS employees (
+            employee_id INT PRIMARY KEY,
+            employment_status ENUM('full_time', 'part_time') NOT NULL
+        );
+        """
+        cursor.execute(create_employees_table)
+
+        print("Tables 'access_logs' and 'employees'created or already exists.")
         
         # Commit changes
         conn.commit()
