@@ -4,11 +4,11 @@ from datetime import datetime
 # MySQL connection
 def get_db_connection():
     conn = mysql.connector.connect(
-        host="localhost",
-        user="root",  
-        password="root",  
-        database="2wayaccess"
-    )
+        host='localhost',        # Hostname of the MySQL server (e.g., 'localhost')
+        database='2wayaccess', # Name of the MySQL database
+        user='root',     # MySQL username
+        password='root'  # MySQL password
+    )    
     return conn
 
 def log_access_to_db(employee_id, timestamp, action):
