@@ -15,8 +15,6 @@ def create_database_and_table():
         cursor.execute("CREATE DATABASE IF NOT EXISTS 2wayaccess")
         print("Database '2wayaccess' created or already exists.")
         
-        # Select the new database
-        cursor.execute("USE 2wayaccess")
 
         # Create the access_logs table
         create_table_query = """

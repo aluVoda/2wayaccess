@@ -50,23 +50,3 @@ def run_simulation():
     # Generate random access logs for 130 employees
     generate_random_access_logs(monitor, 130)
 
-
-  
-  
-  
-
-  
-  
-
-  
-  
-  
-  
-  
-
-  
-  
-
-  
-  
-  
