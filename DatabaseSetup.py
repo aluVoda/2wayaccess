@@ -4,18 +4,18 @@ def create_database_and_table():
     try:
         # Connect to MySQL server
         conn = mysql.connector.connect(
-            host="localhost",  
-            user="root",       
-            password="root" 
-        )
+            host='localhost',        # Hostname of the MySQL server (e.g., 'localhost')
+            database='2wayaccess', # Name of the MySQL database
+            user='root',     # MySQL username
+            password='root'  # MySQL password
+        )    
+             
         cursor = conn.cursor()
 
         # Create the database
         cursor.execute("CREATE DATABASE IF NOT EXISTS 2wayaccess")
         print("Database '2wayaccess' created or already exists.")
         
-        # Select the new database
-        cursor.execute("USE 2wayaccess")
 
         # Create the access_logs table
         create_table_query = """
