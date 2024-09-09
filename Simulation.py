@@ -1,52 +1,63 @@
-from EmployeeMonitor import EmployeeMonitor
-from Employees import FullTimeEmployee, PartTimeEmployee
-from Functions import log_access_to_db, get_employee_status
+import mysql.connector
+from datetime import datetime, timedelta
 import random
-import datetime
 
-def generate_random_time(base_time):
-    """Generates a random datetime for entering or exiting"""
-    random_minutes = random.randint(0, 60 * 9)  # Workday can start anytime between 9 hours span
-    return base_time + datetime.timedelta(minutes=random_minutes)
+def simulate_access_logs():
+    # Connect to MySQL database
+    conn = mysql.connector.connect(
+        host="localhost",
+        user="root",
+        password="root",
+        database="2wayaccess"
+    )
+    cursor = conn.cursor()
 
-def generate_random_access_logs(monitor, num_employees=130):
-    """Generates random access logs for employees based on their employment status"""
-    # Current day and base entry time for random time generation
-    base_date = datetime.datetime(2024, 9, 5, 8, 0, 0)  # Base date (e.g. 8:00 AM)
+    # Fetch all employees along with their employment status
+    cursor.execute("SELECT employee_id, employment_status FROM employees")
+    employees = cursor.fetchall()
 
-    for employee_id in range(1, num_employees + 1):
-        # Fetch employment status from the database
-        employment_status = get_employee_status(employee_id)
+    # Set the time window for simulation (60 days)
+    today = datetime.now().date()
+    start_date = today - timedelta(days=60)
 
-        # Create the appropriate employee object based on status
-        if employment_status == 'full_time':
-            employee = FullTimeEmployee(employee_id)
-        elif employment_status == 'part_time':
-            employee = PartTimeEmployee(employee_id)
-        else:
-            print(f"Error: Employee {employee_id} does not have a valid employment status.")
-            continue
+    for emp in employees:
+        emp_id = emp[0]
+        employment_status = emp[1]  # 'full-time' or 'part-time'
 
-        monitor.add_employee(employee)
+        # Simulate for each day in the last 60 days
+        for day in range(60):
+            current_day = start_date + timedelta(days=day)
 
-        # Generate random entry time
-        entry_time = generate_random_time(base_date)
-        
-        # Log the entry time
-        monitor.log_access(employee_id, entry_time, 'enter')
+            # Determine the number of work days for part-time employees
+            if employment_status == 'part-time':
+                # Part-time employees work only 3-4 days a week
+                if random.random() > 0.5:  # 50% chance they work on a given day
+                    continue  # Skip this day if they don't work
 
-        # Generate random exit time after entry (ensuring the employee leaves after entering)
-        exit_time = entry_time + datetime.timedelta(hours=random.randint(4, 9))  # Work between 4 to 9 hours
-        
-        # Log the exit time
-        monitor.log_access(employee_id, exit_time, 'exit')
+            # Simulate random enter/exit actions
+            num_entries = random.randint(1, 2)  # Employees enter/exit once or twice per day
+            for _ in range(num_entries):
+                # Randomize entry time depending on full-time or part-time status
+                if employment_status == 'full-time':
+                    entry_time = datetime.combine(current_day, datetime.min.time()) + timedelta(hours=random.randint(6, 10))
+                    work_hours = random.uniform(7, 9)  # Full-time employees work 7-9 hours
+                else:  # part-time
+                    entry_time = datetime.combine(current_day, datetime.min.time()) + timedelta(hours=random.randint(8, 12))
+                    work_hours = random.uniform(4, 6)  # Part-time employees work 4-6 hours
 
-    print(f"Random access logs generated for {num_employees} employees.")
+                cursor.execute("INSERT INTO access_logs (employee_id, timestamp, action) VALUES (%s, %s, %s)",
+                               (emp_id, entry_time, 'enter'))
 
-def run_simulation():
-    # Create the employee monitor
-    monitor = EmployeeMonitor()
+                # Exit time depends on how many hours they worked
+                exit_time = entry_time + timedelta(hours=work_hours)
+                cursor.execute("INSERT INTO access_logs (employee_id, timestamp, action) VALUES (%s, %s, %s)",
+                               (emp_id, exit_time, 'exit'))
 
-    # Generate random access logs for 130 employees
-    generate_random_access_logs(monitor, 130)
+    # Commit the data to the database
+    conn.commit()
+    cursor.close()
+    conn.close()
+    print("Simulation data for 60 days has been added, with part-time and full-time employee logic.")
 
+if __name__ == "__main__":
+    simulate_access_logs()

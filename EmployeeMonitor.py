@@ -1,27 +1,23 @@
-from Functions import log_access_to_db, get_employee_logs
-from Employees import FullTimeEmployee, PartTimeEmployee
+import threading
+import Simulation
+import Reports
 
-class EmployeeMonitor:
-    def __init__(self):
-        # Dictionary to store employee objects by employee_id
-        self.employees = {}
+def start_monitoring():
+    # You can simulate or set up a real-time monitoring system here
+    print("Starting employee monitoring system...")
+    Simulation.simulate_access_logs()
 
-    def add_employee(self, employee):
-        """Add a new employee (Full-time or Part-time)"""
-        self.employees[employee.employee_id] = employee
+def start_report_scheduling():
+    print("Starting report scheduling...")
+    Reports.schedule_reports()
 
-    def log_access(self, employee_id, timestamp, action):
-        """Log an access event for the specified employee"""
-        if employee_id in self.employees:
-            employee = self.employees[employee_id]
-            employee.log_access(timestamp, action)
-            log_access_to_db(employee_id, timestamp, action)
-        else:
-            print(f"Employee {employee_id} not found!")
+if __name__ == "__main__":
+    # Run monitoring and report scheduling in parallel threads
+    monitoring_thread = threading.Thread(target=start_monitoring)
+    scheduling_thread = threading.Thread(target=start_report_scheduling)
 
-    def get_employee_report(self, employee_id, date=None):
-        """Generate a report for the specified employee"""
-        if employee_id in self.employees:
-            return self.employees[employee_id].get_report(date)
-        else:
-            print(f"Employee {employee_id} not found!")
+    monitoring_thread.start()
+    scheduling_thread.start()
+
+    monitoring_thread.join()
+    scheduling_thread.join()
