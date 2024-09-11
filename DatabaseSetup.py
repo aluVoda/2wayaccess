@@ -26,23 +26,28 @@ def create_tables(cursor):
     create_employees_table = """
     CREATE TABLE IF NOT EXISTS employees (
         employee_id INT AUTO_INCREMENT PRIMARY KEY,
-        name VARCHAR(255) NOT NULL,
-        employment_status ENUM('fulltime', 'parttime') NOT NULL
+        firstname VARCHAR(255) NOT NULL,
+        lastname VARCHAR(255) NOT NULL,
+        employment_status ENUM('fulltime', 'parttime') NOT NULL,
+        company VARCHAR(255) NOT NULL,
+        manager_id INT
     )
     """
+    
     
     # Create access_logs table with gate_id
     create_access_logs_table = """
     CREATE TABLE IF NOT EXISTS access_logs (
         log_id INT AUTO_INCREMENT PRIMARY KEY,
         employee_id INT NOT NULL,
-        timestamp DATETIME NOT NULL,
+        date DATE NOT NULL,
+        time TIME NOT NULL,
         action ENUM('enter', 'exit') NOT NULL,
         gate_id INT NOT NULL,
         FOREIGN KEY (employee_id) REFERENCES employees(employee_id)
     )
     """
-    
+
     try:
         cursor.execute(create_employees_table)
         cursor.execute(create_access_logs_table)
