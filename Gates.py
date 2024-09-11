@@ -1,5 +1,5 @@
 import mysql.connector
-from datetime import datetime
+from datetime import datetime, timedelta
 import random
 
 # MySQL database configuration
@@ -47,15 +47,44 @@ def log_access(employee_id, gate_id, action):
         conn.close()
 
 # Function to simulate gate activity
-def simulate_gate_activity(gates, employees):
-    actions = ['enter', 'exit']  # Possible actions
-    for i in range(200):  # Simulate 200 random entries/exits
-        employee_id = random.choice(employees)
-        gate_id = random.choice(gates)
-        action = random.choice(actions)
+def simulate_gate_activity():
+    conn = None
+    cursor = None
+    try:
+        conn = mysql.connector.connect(**config)
+        cursor = conn.cursor()
 
-        # Log the simulated access
-        log_access(employee_id, gate_id, action)
+        # Simulate gate activity for 130 employees over 60 days
+        for _ in range(60):
+            for employee_id in range(1, 131):
+                # Check if employee exists
+                cursor.execute("SELECT employee_id FROM employees WHERE employee_id = %s", (employee_id,))
+                if cursor.fetchone() is None:
+                    print(f"Employee {employee_id} not found.")
+                    continue  # Skip this employee if not found
+
+                gate_id = random.randint(1, 6)
+                action = random.choice(['enter', 'exit'])
+                date = (datetime.now() - timedelta(days=random.randint(0, 60))).date()
+                time = (datetime.now() - timedelta(hours=random.randint(0, 10))).time()
+
+                query = """
+                    INSERT INTO access_logs (employee_id, date, time, action, gate_id)
+                    VALUES (%s, %s, %s, %s, %s)
+                """
+                data = (employee_id, date, time, action, gate_id)
+                cursor.execute(query, data)
+
+        conn.commit()
+        print("Gate activity simulation complete.")
+    
+    except mysql.connector.Error as err:
+        print(f"Error: {err}")
+    finally:
+        if cursor:
+            cursor.close()
+        if conn:
+            conn.close()
 
 if __name__ == "__main__":
     simulate_gate_activity(gates, employees)

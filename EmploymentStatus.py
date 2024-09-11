@@ -16,17 +16,21 @@ config = {
 }
 
 def populate_employees():
+    total_employees = 130
+    part_time_percentage = 0.15
+    part_time_count = int(total_employees * part_time_percentage)
+
     try:
         conn = mysql.connector.connect(**config)
         cursor = conn.cursor()
 
         # Simulate 130 employees
-        for i in range(1, 131):
+        for i in range(total_employees):
             first_name = random.choice(first_names)
             last_name = random.choice(last_names)
-            employment_status = 'fulltime' if i > 19 else 'parttime'  # 15% part-time, 85% full-time
+            employment_status = 'parttime' if i < part_time_count else 'fulltime'  # 15% part-time, 85% full-time
             company = random.choice(companies)
-            manager_id = None if employment_status == 'parttime' else random.randint(1, 130)  # Managers only for full-time employees
+            manager_id = random.randint(1, 14)  # Managers
 
             # Insert the employee record into the database
             query = """
