@@ -18,7 +18,7 @@ def populate_employees():
     for i in range(total_employees):
         name = f"Employee_{i + 1}"
         employment_status = 'part-time' if i < part_time_count else 'full-time'
-        cursor.execute("INSERT INTO employees (name, employment_status) VALUES (%s, %s)", (name, employment_status))
+        cursor.execute("INSERT INTO employees (firstname, lastname, employment_status, company, manager_id) VALUES (%s, %s)", (name, employment_status))
 
     conn.commit()
     cursor.close()
