@@ -53,7 +53,18 @@ def generate_report(start_date, end_date, report_type):
         for employee in employees:
             employee_id = employee['employee_id']
             total_hours = calculate_working_hours(employee_id, start_date, end_date)
+            # Fetch gate usage for the employee
+            cursor.execute("""
+                SELECT gate_id, COUNT(*) as access_count
+                FROM access_logs
+                WHERE employee_id = %s AND timestamp BETWEEN %s AND %s
+                GROUP BY gate_id
+            """, (employee_id, start_date, end_date))
+            gate_usage = cursor.fetchall()
+
             print(f"Employee {employee_id}: {total_hours:.2f} hours")
+            for gate in gate_usage:
+                print(f"  Gate {gate['gate_id']}: {gate['access_count']} accesses")
 
         print(f"\n--- End of {report_type} Report ---\n")
 
