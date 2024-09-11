@@ -3,14 +3,14 @@ import time
 import threading
 
 # Importing modules from various parts of the app
-from DatabaseSetup import main as setup_database
+from DatabaseSetup import create_or_update_database
 from EmploymentStatus import populate_employees
 from Gates import simulate_gate_activity
 from Reports import schedule_reports
 
 def run_database_setup():
     print("Setting up the database...")
-    setup_database()
+    create_or_update_database()
 
 def run_employee_setup():
     print("Setting up employee data (full-time and part-time)...")
