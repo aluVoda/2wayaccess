@@ -1,120 +1,158 @@
-import schedule
-import time
+import csv
+import os
+import smtplib
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+from email.mime.base import MIMEBase
+from email import encoders
 from datetime import datetime, timedelta
-from utils.db_utils import get_db_connection, close_db_connection
+import mysql.connector
+from utils.db_utils import connect_to_database
 
-def calculate_working_hours(employee_id, start_date, end_date):
-    conn = get_db_connection()
-    if not conn:
-        return 0
+# Constants
+BACKUP_FOLDER = 'Backup'
+EMAIL_SENDER = 'florentin.voda@gmail.com'  # Replace with your email
+EMAIL_PASSWORD = 'wckwwmxkilldxjls'  # Replace with your email password
+SMTP_SERVER = 'smtp.gmail.com'  # Replace with your SMTP server
+SMTP_PORT = 587  # Replace with your SMTP port
 
+def ensure_backup_folder():
+    """Ensure the backup folder exists."""
+    if not os.path.exists(BACKUP_FOLDER):
+        os.makedirs(BACKUP_FOLDER)
+
+def fetch_working_hours(start_date, end_date):
+    """Fetch working hours between start_date and end_date."""
+    query = """
+        SELECT e.firstname, e.lastname, DATE(a.date) AS date, 
+               SUM(TIME_TO_SEC(TIMEDIFF(a.exit_time, a.entry_time)) / 3600) AS working_hours
+        FROM (
+            SELECT employee_id, date, 
+                   MIN(CASE WHEN direction = 'in' THEN time END) AS entry_time,
+                   MAX(CASE WHEN direction = 'out' THEN time END) AS exit_time
+            FROM access_logs
+            WHERE date BETWEEN %s AND %s
+            GROUP BY employee_id, date
+        ) AS a
+        JOIN employees AS e ON a.employee_id = e.employee_id
+        GROUP BY e.firstname, e.lastname, DATE(a.date)
+    """
+    conn = None
     try:
+        conn = connect_to_database()
         cursor = conn.cursor(dictionary=True)
-        query = """
-        SELECT timestamp, action FROM access_logs
-        WHERE employee_id = %s AND timestamp BETWEEN %s AND %s
-        ORDER BY timestamp ASC
-        """
-        cursor.execute(query, (employee_id, start_date, end_date))
-        logs = cursor.fetchall()
-
-        total_hours = timedelta()
-        last_entry = None
-
-        for log in logs:
-            if log['action'] == 'enter':
-                last_entry = log['timestamp']
-            elif log['action'] == 'exit' and last_entry:
-                total_hours += (log['timestamp'] - last_entry)
-                last_entry = None
-
-        return total_hours.total_seconds() / 3600  # Convert to hours
-
-    except Exception as e:
-        print(f"Error calculating working hours for employee {employee_id}: {e}")
-        return 0
-
+        cursor.execute(query, (start_date, end_date))
+        return cursor.fetchall()
+    except mysql.connector.Error as err:
+        print(f"Error: {err}")
+        return []
     finally:
-        close_db_connection(conn, cursor)
+        if cursor:
+            cursor.close()
+        if conn:
+            conn.close()
 
-def generate_report(start_date, end_date, report_type):
-    conn = get_db_connection()
-    if not conn:
-        return
-
+def fetch_managers_emails():
+    """Fetch email addresses of all managers."""
+    query = """
+        SELECT DISTINCT m.email
+        FROM managers AS m
+        JOIN employees AS e ON m.manager_id = e.manager_id
+    """
+    conn = None
     try:
+        conn = connect_to_database()
         cursor = conn.cursor(dictionary=True)
-        cursor.execute("SELECT employee_id FROM employees")
-        employees = cursor.fetchall()
-
-        print(f"\n--- {report_type} Report ---")
-        print(f"Report Period: {start_date} to {end_date}\n")
-
-        for employee in employees:
-            employee_id = employee['employee_id']
-            total_hours = calculate_working_hours(employee_id, start_date, end_date)
-            # Fetch gate usage for the employee
-            cursor.execute("""
-                SELECT gate_id, COUNT(*) as access_count
-                FROM access_logs
-                WHERE employee_id = %s AND timestamp BETWEEN %s AND %s
-                GROUP BY gate_id
-            """, (employee_id, start_date, end_date))
-            gate_usage = cursor.fetchall()
-
-            print(f"Employee {employee_id}: {total_hours:.2f} hours")
-            for gate in gate_usage:
-                print(f"  Gate {gate['gate_id']}: {gate['access_count']} accesses")
-
-        print(f"\n--- End of {report_type} Report ---\n")
-
-    except Exception as e:
-        print(f"Error generating report: {e}")
-
+        cursor.execute(query)
+        return [row['email'] for row in cursor.fetchall()]
+    except mysql.connector.Error as err:
+        print(f"Error: {err}")
+        return []
     finally:
-        close_db_connection(conn, cursor)
+        if cursor:
+            cursor.close()
+        if conn:
+            conn.close()
 
-def generate_daily_report():
-    today = datetime.now().date()
-    start_of_day = datetime.combine(today, datetime.min.time())
-    end_of_day = datetime.combine(today, datetime.max.time())
-    generate_report(start_of_day, end_of_day, "Daily")
+def generate_report_filename(report_type):
+    """Generate a report filename based on the current date."""
+    current_date = datetime.now().strftime('%Y-%m-%d')
+    return os.path.join(BACKUP_FOLDER, f"{current_date}_{report_type}")
 
-def generate_weekly_report():
-    today = datetime.now().date()
-    start_of_week = today - timedelta(days=today.weekday())
-    start_of_week = datetime.combine(start_of_week, datetime.min.time())
-    end_of_week = datetime.combine(today, datetime.max.time())
-    generate_report(start_of_week, end_of_week, "Weekly")
-
-def generate_monthly_report():
-    today = datetime.now().date()
-    first_day_of_month = today.replace(day=1)
-    previous_month_last_day = first_day_of_month - timedelta(days=1)
-    start_of_previous_month = datetime.combine(previous_month_last_day.replace(day=1), datetime.min.time())
-    end_of_previous_month = datetime.combine(previous_month_last_day, datetime.max.time())
-    generate_report(start_of_previous_month, end_of_previous_month, "Monthly")
-
-def schedule_reports():
-    # Schedule daily report at 23:00
-    schedule.every().day.at("23:00").do(generate_daily_report)
+def save_report(data, filename):
+    """Save the report data to both CSV and TXT formats."""
+    csv_filename = f"{filename}.csv"
+    txt_filename = f"{filename}.txt"
     
-    # Schedule weekly report every Sunday at 23:00
-    schedule.every().sunday.at("23:00").do(generate_weekly_report)
+    with open(csv_filename, 'w', newline='') as csvfile:
+        writer = csv.writer(csvfile)
+        writer.writerow(['Firstname', 'Lastname', 'Date', 'WorkingHours'])
+        for row in data:
+            writer.writerow([row['firstname'], row['lastname'], row['date'], row['working_hours']])
     
-    # Schedule monthly report by running a daily check at 23:00, and generate the report only on the 3rd of the month
-    schedule.every().day.at("23:00").do(check_monthly_report)
+    with open(txt_filename, 'w') as txtfile:
+        txtfile.write("Firstname, Lastname, Date, WorkingHours\n")
+        for row in data:
+            txtfile.write(f"{row['firstname']}, {row['lastname']}, {row['date']}, {row['working_hours']}\n")
 
-    print("Report scheduling initiated...")
+def send_email_with_attachment(recipient_email, subject, body, attachment_path):
+    """Send an email with an attachment."""
+    msg = MIMEMultipart()
+    msg['From'] = EMAIL_SENDER
+    msg['To'] = recipient_email
+    msg['Subject'] = subject
 
-    while True:
-        schedule.run_pending()
-        time.sleep(60)
+    msg.attach(MIMEText(body, 'plain'))
 
-def check_monthly_report():
+    with open(attachment_path, 'rb') as attachment:
+        part = MIMEBase('application', 'octet-stream')
+        part.set_payload(attachment.read())
+        encoders.encode_base64(part)
+        part.add_header(
+            'Content-Disposition',
+            f'attachment; filename={os.path.basename(attachment_path)}',
+        )
+        msg.attach(part)
+
+    with smtplib.SMTP(SMTP_SERVER, SMTP_PORT) as server:
+        server.starttls()
+        server.login(EMAIL_SENDER, EMAIL_PASSWORD)
+        server.send_message(msg)
+
+def send_reports():
+    """Generate and send daily, weekly, and monthly reports."""
+    # Dates for the reports
     today = datetime.now().date()
-    if today.day == 3:  # Only generate the monthly report on the 3rd of the month
-        generate_monthly_report()
+    yesterday = today - timedelta(days=1)
+    last_week_start = today - timedelta(days=today.weekday() + 7)
+    last_week_end = last_week_start + timedelta(days=6)
+    last_month_start = (today.replace(day=1) - timedelta(days=1)).replace(day=1)
+    last_month_end = today.replace(day=1) - timedelta(days=1)
+
+    # Generate and save daily report
+    daily_data = fetch_working_hours(yesterday, yesterday)
+    daily_filename = generate_report_filename('daily_report')
+    save_report(daily_data, daily_filename)
+    
+    # Generate and save weekly report
+    weekly_data = fetch_working_hours(last_week_start, last_week_end)
+    weekly_filename = generate_report_filename('weekly_report')
+    save_report(weekly_data, weekly_filename)
+    
+    # Generate and save monthly report
+    monthly_data = fetch_working_hours(last_month_start, last_month_end)
+    monthly_filename = generate_report_filename('monthly_report')
+    save_report(monthly_data, monthly_filename)
+    
+    # Fetch manager emails
+    manager_emails = fetch_managers_emails()
+    
+    # Send reports via email
+    for email in manager_emails:
+        send_email_with_attachment(email, 'Daily Report', 'Please find the daily report attached.', daily_filename + '.csv')
+        send_email_with_attachment(email, 'Weekly Report', 'Please find the weekly report attached.', weekly_filename + '.csv')
+        send_email_with_attachment(email, 'Monthly Report', 'Please find the monthly report attached.', monthly_filename + '.csv')
 
 if __name__ == "__main__":
-    schedule_reports()
+    ensure_backup_folder()
+    send_reports()

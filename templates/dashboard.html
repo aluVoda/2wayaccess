@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <meta charset="UTF-8">
+    <title>Dashboard</title>
+</head>
+<body>
+    <h2>Dashboard</h2>
+    <a href="/create_table">Create New Table</a>
+    <table>
+        <tr>
+            <th>Table Name</th>
+            <th>Actions</th>
+        </tr>
+        {% for table in tables %}
+        <tr>
+            <td>{{ table[0] }}</td>
+            <td><a href="/view/{{ table[0] }}">View</a> | <a href="/modify/{{ table[0] }}">Modify</a></td>
+        </tr>
+        {% endfor %}
+    </table>
+    <a href="/logout">Logout</a>
+</body>
+</html>
