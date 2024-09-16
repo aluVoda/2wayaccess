@@ -1,17 +1,8 @@
 from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify
 from Reports import send_reports  
-import csv
-import os
-import smtplib
-from email.mime.multipart import MIMEMultipart
-from email.mime.text import MIMEText
-from email.mime.base import MIMEBase
-from email import encoders
-from datetime import datetime, timedelta
 import mysql.connector
 from utils.db_utils import connect_to_database
 from functools import wraps
-import json
 from Gates import generate_json
 
 app = Flask(__name__)
@@ -108,7 +99,7 @@ def modify_table(table_name):
 def create_table():
     if request.method == 'POST':
         table_name = request.form['table_name']
-        columns = request.form['columns']  # This should be a comma-separated list of columns
+        columns = request.form['columns']  
 
         try:
             conn = connect_to_database()

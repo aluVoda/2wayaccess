@@ -54,7 +54,7 @@ def generate_managers(cursor, company_name, domain, employee_count):
                 INSERT INTO managers (firstname, lastname, department, company)
                 VALUES (%s, %s, %s, %s) AS new_manager
             """, (firstname, lastname, department, company_name))
-            managers.append(cursor.lastrowid)  # Append manager_id for future reference
+            managers.append(cursor.lastrowid)  
     return managers
 
 def populate_employees(cursor):

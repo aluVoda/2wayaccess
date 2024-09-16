@@ -3,8 +3,8 @@ from datetime import datetime, timedelta
 import mysql.connector
 from utils.db_utils import connect_to_database
 
-# Constants
-NUM_GATES = 6  # Total number of gates
+
+NUM_GATES = 6  
 
 def generate_random_time(start_time, work_duration):
     """Generate a random time of day within the work duration."""
@@ -20,9 +20,9 @@ def generate_access_logs_for_employee(employee_id, employment_status, num_days=3
     
     # Set work hours based on employment status
     if employment_status == "fulltime":
-        work_hours = (7, 9)  # Full-time work hours range (in hours)
+        work_hours = (7, 9)  # Full-time work hours range 
     else:
-        work_hours = (4, 6)  # Part-time work hours range (in hours)
+        work_hours = (4, 6)  # Part-time work hours range 
     
     for i in range(num_days):
         day = today - timedelta(days=i)
@@ -52,7 +52,7 @@ def populate_access_logs():
         conn = connect_to_database()
         cursor = conn.cursor()
         
-        # Fetch all employee data (ID and employment status)
+        # Fetch all employee data 
         cursor.execute("SELECT employee_id, employment_status FROM employees")
         employees = cursor.fetchall()
         

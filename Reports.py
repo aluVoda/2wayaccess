@@ -11,10 +11,10 @@ from utils.db_utils import connect_to_database
 
 # Constants
 BACKUP_FOLDER = 'Backup'
-EMAIL_SENDER = 'florentin.voda@gmail.com'  # Replace with your email
-EMAIL_PASSWORD = 'wckwwmxkilldxjls'  # Replace with your email password
-SMTP_SERVER = 'smtp.gmail.com'  # Replace with your SMTP server
-SMTP_PORT = 587  # Replace with your SMTP port
+EMAIL_SENDER = 'florentin.voda@gmail.com'  
+EMAIL_PASSWORD = 'wckwwmxkilldxjls'  
+SMTP_SERVER = 'smtp.gmail.com'  
+SMTP_PORT = 587  
 
 def ensure_backup_folder():
     """Ensure the backup folder exists."""
