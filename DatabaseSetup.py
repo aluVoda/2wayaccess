@@ -1,180 +1,166 @@
 import mysql.connector
+from mysql.connector import errorcode
+from utils.db_utils import connect_to_database
 
-# Database configuration
-config = {
-    'user': 'root',
-    'password': 'root',
-    'host': 'localhost',
-    'raise_on_warnings': True
-}
+def database_exists(cursor, db_name):
+    """Check if the database exists."""
+    cursor.execute("SHOW DATABASES LIKE %s", (db_name,))
+    return cursor.fetchone() is not None
 
-database_name = '2wayaccess'
+def create_database(cursor, db_name):
+    """Create the database if it does not exist."""
+    if not database_exists(cursor, db_name):
+        cursor.execute(f"CREATE DATABASE {db_name}")
+        print(f"Database '{db_name}' created.")
+    else:
+        print(f"Database '{db_name}' already exists.")
 
+def check_and_update_table(cursor, table_name, create_sql, expected_columns):
+    """Check if table exists and either create or update it."""
+    cursor.execute(f"SHOW TABLES LIKE '{table_name}'")
+    result = cursor.fetchone()
 
-def create_or_update_database():
+    if result:
+        print(f"Table '{table_name}' exists. Checking for differences...")
+
+        # Get the current table structure
+        cursor.execute(f"SHOW COLUMNS FROM {table_name}")
+        current_columns = {column[0]: column[1] for column in cursor.fetchall()}
+
+        # Compare the expected columns with the current ones
+        for column_name, column_type in expected_columns.items():
+            if column_name not in current_columns:
+                print(f"Adding missing column '{column_name}' to '{table_name}'")
+                cursor.execute(f"ALTER TABLE {table_name} ADD {column_name} {column_type}")
+            elif current_columns[column_name] != column_type:
+                print(f"Updating column '{column_name}' in '{table_name}'")
+                cursor.execute(f"ALTER TABLE {table_name} MODIFY {column_name} {column_type}")
+    else:
+        print(f"Table '{table_name}' does not exist. Creating the table.")
+        cursor.execute(create_sql)
+
+def create_or_update_tables(cursor):
+    """Create or update tables."""
+    # Companies table
+    companies_table = """
+        CREATE TABLE IF NOT EXISTS companies (
+            name VARCHAR(255) PRIMARY KEY,
+            domain VARCHAR(255),
+            size INT
+        )
+    """
+    companies_columns = {
+        'name': 'VARCHAR(255)',
+        'domain': 'VARCHAR(255)',
+        'size': 'INT'
+    }
+    check_and_update_table(cursor, 'companies', companies_table, companies_columns)
+
+    # Managers table
+    managers_table = """
+        CREATE TABLE IF NOT EXISTS managers (
+            manager_id INT AUTO_INCREMENT PRIMARY KEY,
+            firstname VARCHAR(255),
+            lastname VARCHAR(255),
+            department VARCHAR(255),
+            company VARCHAR(255),
+            email VARCHAR(255),
+            FOREIGN KEY (company) REFERENCES companies(name) ON DELETE CASCADE
+        )
+    """
+    managers_columns = {
+        'manager_id': 'INT AUTO_INCREMENT PRIMARY KEY',
+        'firstname': 'VARCHAR(255)',
+        'lastname': 'VARCHAR(255)',
+        'department': 'VARCHAR(255)',
+        'company': 'VARCHAR(255)',
+        'email': 'VARCHAR(255)'
+    }
+    check_and_update_table(cursor, 'managers', managers_table, managers_columns)
+
+    # Employees table
+    employees_table = """
+        CREATE TABLE IF NOT EXISTS employees (
+            employee_id INT AUTO_INCREMENT PRIMARY KEY,
+            firstname VARCHAR(255),
+            lastname VARCHAR(255),
+            employment_status ENUM('fulltime', 'parttime'),
+            company VARCHAR(255),
+            manager_id INT,
+            FOREIGN KEY (company) REFERENCES companies(name) ON DELETE CASCADE,
+            FOREIGN KEY (manager_id) REFERENCES managers(manager_id) ON DELETE SET NULL
+        )
+    """
+    employees_columns = {
+        'employee_id': 'INT AUTO_INCREMENT PRIMARY KEY',
+        'firstname': 'VARCHAR(255)',
+        'lastname': 'VARCHAR(255)',
+        'employment_status': "ENUM('fulltime', 'parttime')",
+        'company': 'VARCHAR(255)',
+        'manager_id': 'INT'
+    }
+    check_and_update_table(cursor, 'employees', employees_table, employees_columns)
+
+    # Access Logs table
+    access_logs_table = """
+        CREATE TABLE IF NOT EXISTS access_logs (
+            log_id INT AUTO_INCREMENT PRIMARY KEY,
+            employee_id INT,
+            date DATE,
+            time TIME,
+            gate_id INT,
+            direction ENUM('in', 'out'),
+            FOREIGN KEY (employee_id) REFERENCES employees(employee_id) ON DELETE CASCADE
+        )
+    """
+    access_logs_columns = {
+        'log_id': 'INT AUTO_INCREMENT PRIMARY KEY',
+        'employee_id': 'INT',
+        'date': 'DATE',
+        'time': 'TIME',
+        'gate_id': 'INT',
+        'direction': "ENUM('in', 'out')"
+    }
+    check_and_update_table(cursor, 'access_logs', access_logs_table, access_logs_columns)
+
+def setup_database():
+    """Main function to setup the database and tables."""
     conn = None
     cursor = None
     try:
-        # Connect to MySQL without specifying the database
-        conn = mysql.connector.connect(**config)
+        # Connect to MySQL server without specifying the database
+        conn = mysql.connector.connect(
+            host='localhost',       
+            user='root',   
+            password='root' 
+        )
+        if conn is None:
+            raise ValueError("Failed to connect to the database server.")
+
         cursor = conn.cursor()
 
-        # Check if the database exists
-        cursor.execute(f"SHOW DATABASES LIKE '{database_name}'")
-        database_exists = cursor.fetchone()
+        # Create the database if it doesn't exist
+        create_database(cursor, '2wayaccess')
+        
+        # Switch to the new database
+        cursor.execute("USE 2wayaccess")
 
-        if not database_exists:
-            # If the database doesn't exist, create it
-            cursor.execute(f"CREATE DATABASE {database_name}")
-            conn.commit()
-            print(f"Database '{database_name}' created.")
-        else:
-            print(f"Database '{database_name}' already exists.")
+        # Create or update the necessary tables
+        create_or_update_tables(cursor)
 
-        # Switch to the '2wayaccess' database
-        conn.database = database_name
-
-        # Ensure tables exist with correct schema
-        check_and_update_schema(cursor)
         conn.commit()
-
+        print("Database setup completed.")
     except mysql.connector.Error as err:
         print(f"Error: {err}")
+        if conn:
+            conn.rollback()
+    except ValueError as ve:
+        print(ve)
     finally:
         if cursor:
             cursor.close()
         if conn:
             conn.close()
 
-
-def check_and_update_schema(cursor):
-    # Check if employees table exists
-    cursor.execute("""
-        SELECT COUNT(*) 
-        FROM INFORMATION_SCHEMA.TABLES 
-        WHERE TABLE_SCHEMA = %s 
-        AND TABLE_NAME = 'employees';
-    """, (database_name,))
-    
-    table_exists = cursor.fetchone()[0]
-
-    if table_exists == 0:
-        # Create employees table
-        create_employees_table(cursor)
-    else:
-        # Check if employees table matches the expected schema
-        check_and_update_employees_table(cursor)
-
-    # Check if access_logs table exists
-    cursor.execute("""
-        SELECT COUNT(*) 
-        FROM INFORMATION_SCHEMA.TABLES 
-        WHERE TABLE_SCHEMA = %s 
-        AND TABLE_NAME = 'access_logs';
-    """, (database_name,))
-    
-    table_exists = cursor.fetchone()[0]
-
-    if table_exists == 0:
-        # Create access_logs table
-        create_access_logs_table(cursor)
-    else:
-        # Check if access_logs table matches the expected schema
-        check_and_update_access_logs_table(cursor)
-
-
-def create_employees_table(cursor):
-    cursor.execute("""
-        CREATE TABLE employees (
-            employee_id INT AUTO_INCREMENT PRIMARY KEY,
-            firstname VARCHAR(255),
-            lastname VARCHAR(255),
-            employment_status ENUM('fulltime', 'parttime'),
-            company VARCHAR(255),
-            manager_id INT
-        );
-    """)
-    print("Created 'employees' table.")
-
-
-def check_and_update_employees_table(cursor):
-    # Check if columns match the expected schema for 'employees'
-    cursor.execute("""
-        SELECT COLUMN_NAME 
-        FROM INFORMATION_SCHEMA.COLUMNS 
-        WHERE TABLE_SCHEMA = %s AND TABLE_NAME = 'employees';
-    """, (database_name,))
-    
-    columns = {row[0] for row in cursor.fetchall()}
-    expected_columns = {'employee_id', 'firstname', 'lastname', 'employment_status', 'company', 'manager_id'}
-    
-    missing_columns = expected_columns - columns
-    extra_columns = columns - expected_columns
-
-    if missing_columns:
-        for column in missing_columns:
-            # Add missing columns based on their type
-            if column == 'firstname':
-                cursor.execute("ALTER TABLE employees ADD COLUMN firstname VARCHAR(255);")
-            elif column == 'lastname':
-                cursor.execute("ALTER TABLE employees ADD COLUMN lastname VARCHAR(255);")
-            elif column == 'employment_status':
-                cursor.execute("ALTER TABLE employees ADD COLUMN employment_status ENUM('fulltime', 'parttime');")
-            elif column == 'company':
-                cursor.execute("ALTER TABLE employees ADD COLUMN company VARCHAR(255);")
-            elif column == 'manager_id':
-                cursor.execute("ALTER TABLE employees ADD COLUMN manager_id INT;")
-            print(f"Added missing column: {column}.")
-
-    if extra_columns:
-        print(f"Extra columns found in 'employees' table: {extra_columns}. Please review manually.")
-
-
-def create_access_logs_table(cursor):
-    cursor.execute("""
-        CREATE TABLE access_logs (
-            log_id INT AUTO_INCREMENT PRIMARY KEY,
-            employee_id INT,
-            date DATE,
-            time TIME,
-            action ENUM('enter', 'exit'),
-            gate_id INT,
-            FOREIGN KEY (employee_id) REFERENCES employees(employee_id)
-        );
-    """)
-    print("Created 'access_logs' table.")
-
-
-def check_and_update_access_logs_table(cursor):
-    # Check if columns match the expected schema for 'access_logs'
-    cursor.execute("""
-        SELECT COLUMN_NAME 
-        FROM INFORMATION_SCHEMA.COLUMNS 
-        WHERE TABLE_SCHEMA = %s AND TABLE_NAME = 'access_logs';
-    """, (database_name,))
-    
-    columns = {row[0] for row in cursor.fetchall()}
-    expected_columns = {'log_id', 'employee_id', 'date', 'time', 'action', 'gate_id'}
-    
-    missing_columns = expected_columns - columns
-    extra_columns = columns - expected_columns
-
-    if missing_columns:
-        for column in missing_columns:
-            # Add missing columns based on their type
-            if column == 'date':
-                cursor.execute("ALTER TABLE access_logs ADD COLUMN date DATE;")
-            elif column == 'time':
-                cursor.execute("ALTER TABLE access_logs ADD COLUMN time TIME;")
-            elif column == 'action':
-                cursor.execute("ALTER TABLE access_logs ADD COLUMN action ENUM('enter', 'exit');")
-            elif column == 'gate_id':
-                cursor.execute("ALTER TABLE access_logs ADD COLUMN gate_id INT;")
-            print(f"Added missing column: {column}.")
-
-    if extra_columns:
-        print(f"Extra columns found in 'access_logs' table: {extra_columns}. Please review manually.")
-
-
 if __name__ == "__main__":
-    create_or_update_database()
+    setup_database()

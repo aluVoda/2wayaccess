@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <meta charset="UTF-8">
+    <title>View Table: {{ table_name }}</title>
+</head>
+<body>
+    <h2>Table: {{ table_name }}</h2>
+    <table border="1">
+        <tr>
+            {% for column in columns %}
+            <th>{{ column['Field'] }}</th>
+            {% endfor %}
+        </tr>
+        {% for row in rows %}
+        <tr>
+            {% for column in columns %}
+            <td>{{ row[column['Field']] }}</td>
+            {% endfor %}
+        </tr>
+        {% endfor %}
+    </table>
+    <a href="/modify/{{ table_name }}">Modify Table</a> |
+    <a href="/dashboard">Back to Dashboard</a>
+</body>
+</html>

@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <meta charset="UTF-8">
+    <title>Modify Table: {{ table_name }}</title>
+</head>
+<body>
+    <h2>Modify Table: {{ table_name }}</h2>
+    <form method="post" action="">
+        {% for column in columns %}
+        <label>{{ column }}</label>
+        <input type="text" name="{{ column }}" required><br>
+        {% endfor %}
+        <button type="submit">Submit</button>
+    </form>
+    <a href="/view/{{ table_name }}">Back to Table</a> |
+    <a href="/dashboard">Back to Dashboard</a>
+</body>
+</html>
