@@ -1,5 +1,5 @@
 import mysql.connector
-from mysql.connector import errorcode
+from mysql.connector import Error, errorcode
 from utils.db_utils import connect_to_database
 
 def database_exists(cursor, db_name):
